@@ -254,4 +254,57 @@
 		/>   
 	</target>
 
+	<target name="wsEjbDeployWithClient">
+		<taskdef name="wsEjbDeployWithClient" classname="com.ibm.websphere.ant.tasks.WsEjbDeploy" />
+		<wsEjbDeployWithClient 
+			inputJar="" 
+			outputJar=""
+			wasHome="" 
+			workingDirectory="" 
+			codegen="false" 
+			keepGenerated="true" 
+			classpath=""
+			trace=""
+			jdkComplianceLevel=""
+			failonerror=""
+			noValidate=""
+			noWarnings=""
+			noInform=""
+            dbname=""
+            dbschema=""
+            dbvendor=""
+            dynamic=""
+            compatible35=""
+            sqlj=""
+		/>
+		
+		<antcall target="wsEjbDeployUnjar"/>
+		<antcall target="wsEjbDeployJarEJBClient"/>
+		<antcall target="wsEjbDeployJarEJB"/>
+	</target>
+	
+	<target name="wsEjbDeployUnjar">
+	    <unjar 
+	    	src="" 
+	    	dest=""/>	
+	</target>
+	
+	<target name="wsEjbDeployJarEJBClient">
+		<jar 
+			destfile=""
+			basedir=""
+			includes=""
+			excludes=""
+			manifest=""/>
+	</target>
+	
+	<target name="wsEjbDeployJarEJB">
+		<jar 
+			destfile=""
+			basedir=""
+			includes=""
+			excludes=""
+			manifest=""/>
+	</target>
+	
 </project>

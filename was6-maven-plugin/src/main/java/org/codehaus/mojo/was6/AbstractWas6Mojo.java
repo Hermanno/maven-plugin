@@ -269,6 +269,77 @@ public abstract class AbstractWas6Mojo
         
         return element;
     }
+    
+    
+    /**
+     * Fetches the element describing the IBM task.
+     * @param document build document.
+     * @param targetName the name of the target.
+     * @param taskName the name of the task.
+     * @return element for this mojo's task.
+     * @throws MojoExecutionException should normally never happen.
+     */
+    protected Element getTaskElement( Document document , String targetName, String taskName)
+        throws MojoExecutionException
+    {
+        Element element = (Element) document.selectSingleNode( "//target[@name='" + targetName + "']/" + taskName );
+        if ( element == null )
+        {
+            throw new MojoExecutionException( "BUG: Task is not defined: " + targetName + "/" + taskName );
+        }
+        
+        return element;
+    }
+
+    /**
+     * Configures task attributes.
+     * 
+     * @param document document containing buildscript.
+     * @param attributeName attribute to (un)define
+     * @param value to set, if null attribute with name attributeName will be removed, else defined with this value
+     * @throws MojoExecutionException if attribute wasn't defined in build script.
+     */
+    protected void configureTaskAttribute( Document document, String attributeName, Object value ,String targetName, String taskName)
+        throws MojoExecutionException
+    {
+        Element taskElement = getTaskElement( document , targetName,  taskName);
+        Attribute attribute = (org.dom4j.Attribute) taskElement.selectSingleNode( "@" + attributeName );
+
+        if ( attribute == null )
+        {
+            getLog().warn( "Build script does not contain attribute: " + attributeName );
+            return;
+            // throw new MojoExecutionException( "BUG: Build script does not contain attribute: " + attributeName );
+        }
+
+        if ( value != null )
+        {
+            String valueToSet = value instanceof File ? ((File) value ).getAbsolutePath() : value.toString();
+            attribute.setText( valueToSet );
+        }
+        else
+        {
+            taskElement.remove( attribute );
+        }
+    }
+
+    /**
+     * Configures task attributes.
+     * 
+     * @param document document containing buildscript.
+     * @param attributeName attribute to (un)define
+     * @throws MojoExecutionException if attribute wasn't defined in build script.
+     */
+    protected void deleteTaskAttribute( Document document, String attributeName, String targetName, String taskName)
+        throws MojoExecutionException{
+        Element taskElement = getTaskElement( document , targetName,  taskName);
+        Attribute attribute = (org.dom4j.Attribute) taskElement.selectSingleNode( "@" + attributeName );
+        if ( attribute == null ) {
+            getLog().warn( "Build script does not contain attribute: " + attributeName );
+        }else{
+        	attribute.detach();
+        }
+    }
 
     /**
      * Configures task attributes.

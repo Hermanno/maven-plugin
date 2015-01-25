@@ -26,7 +26,7 @@ import org.dom4j.Document;
  * 
  * @goal ejbdeploy
  * @phase generate-sources
- * @requiresDependencyResolution compile
+ * @requiresDependencyResolution compile+runtime
  * @execute phase="package"
  * @author <a href="mailto:david@codehaus.org">David J. M. Karlsen</a>
  * @author <a href="mailto:javier.murciego@gmail.com">Javier Murciego</a>
@@ -114,6 +114,15 @@ public class EjbDeployMojo
      */
     private boolean sqlj;
 
+    /**
+     * Specify the classpath.
+     * 
+     * @parameter expression="${was6.compileClasspathElements}" default-value="${project.compileClasspathElements}"  
+     * @requiresDependencyResolution compile
+     * @required
+     */
+    private List compileClasspathElements;
+    
 	/**
 	 * Classifier to add to the artifact generated. If given, the artifact will
 	 * be an attachment instead.
@@ -163,6 +172,64 @@ public class EjbDeployMojo
      */
     private String wasVersion;
 
+    /**
+     * True if need to be generated client jar.
+     * 
+     * @parameter expression="${was6.genEjbClientJar}" default-value="false"
+     */
+    private boolean genEjbClientJar;
+    
+	/**
+	 * Specify the files should include in the EjbClient. If ejbClientIncludes
+	 * and ejbClientExcludes are empty the plugin use the default value
+	 * ejbClientIncludes="" and
+	 * ejbClientExcludes="/_EJS**.class,** /EJS**.class"
+	 * 
+	 * @parameter expression="${was6.ejbClientIncludes}".
+	 */
+	private String ejbClientIncludes;
+
+    /**
+     * Specify the files should exclude in the EjbClient. If ejbClientIncludes
+	 * and ejbClientExcludes are empty the plugin use the default value
+	 * ejbClientIncludes="" and
+	 * ejbClientExcludes="/_EJS**.class,** /EJS**.class"
+     * 
+     * @parameter expression="${was6.ejbClientExcludes}".
+     */
+    private String ejbClientExcludes;
+    
+    /**
+     * Specify the files should include in the Ejb. If ejbIncludes
+	 * and ejbExcludes are empty the plugin use the default value
+	 * ejbIncludes="" and ejbExcludes=""
+     * 
+     * @parameter expression="${was6.ejbIncludes}" default-value="".
+     */
+    private String ejbIncludes;
+
+    /**
+     * Specify the files should exclude in the Ejb.If ejbIncludes
+	 * and ejbExcludes are empty the plugin use the default value
+	 * ejbIncludes="" and ejbExcludes=""
+     * 
+     * @parameter expression="${was6.ejbExcludes}" default-value="".
+     */
+    private String ejbExcludes;
+    
+	/**
+	 * The manifest for the ejb client
+	 * 
+	 * @parameter expression="${was6.ejbClientManifest}".
+	 */
+	private String ejbClientManifest;
+
+	/**
+	 * The manifest for the ejb. The default value is META-INF/MANIFEST.MF.
+	 * 
+	 * @parameter expression="${was6.ejbManifest}" default-value="${project.build.directory}/was6-maven-plugin/ejb/META-INF/MANIFEST.MF".
+	 */
+	private String ejbManifest;
 
     protected File getOutputJarFile()
     {
@@ -184,6 +251,9 @@ public class EjbDeployMojo
      */
     protected String getTaskName()
     {
+    	if(genEjbClientJar){
+    		return "wsEjbDeployWithClient";
+    	}
         return "wsEjbDeploy";
     }
 
@@ -225,6 +295,45 @@ public class EjbDeployMojo
         {
             configureTaskAttribute( document, "jdkComplianceLevel", 
                                     "1.5".equals( jdkComplianceLevel ) ? "5.0" : jdkComplianceLevel );
+        }
+        if ( genEjbClientJar ){
+        	
+        	configureTaskAttribute( document, "src", getOutputJarFile() , "wsEjbDeployUnjar" , "unjar");
+        	configureTaskAttribute( document, "dest", getWorkingDirectory().getAbsolutePath()+"/ejb" , "wsEjbDeployUnjar" , "unjar");
+        	
+        	if ( (ejbClientIncludes==null || "".equals(ejbClientIncludes)) && (ejbClientExcludes==null || "".equals(ejbClientExcludes))) {
+        		getLog().debug("Initialize default filters for EJBClient.jar as exclude=**/_EJS**.class,**/EJS**.class ");
+        		ejbClientExcludes="**/_EJS**.class,**/EJS**.class";
+        		ejbClientIncludes="";
+        	}
+        	configureTaskAttribute( document, "includes", ejbClientIncludes , "wsEjbDeployJarEJBClient" , "jar");
+        	configureTaskAttribute( document, "excludes", ejbClientExcludes , "wsEjbDeployJarEJBClient" , "jar");
+        	configureTaskAttribute( document, "destfile", new File( getMavenProject().getBuild().getDirectory(), executedProject.getArtifact().getArtifactId() + "Client-" + executedProject.getArtifact().getVersion() + ".jar") , "wsEjbDeployJarEJBClient" , "jar");
+        	configureTaskAttribute( document, "basedir", getWorkingDirectory().getAbsolutePath()+"/ejb" , "wsEjbDeployJarEJBClient" , "jar");
+            if(ejbClientManifest!=null && "".equals(ejbClientManifest)){
+            	final File manifestEJBClientFile = new File(ejbClientManifest);
+	            if ( !inputFile.canRead() ){
+	                throw new MojoExecutionException( "Invalid manifest: " + inputFile.getAbsolutePath() );
+	            }
+	            getLog().debug("Use specifique manifest for EjbClient :"+ejbClientManifest);
+	            configureTaskAttribute( document, "manifest", manifestEJBClientFile ,"wsEjbDeployJarEJBClient" , "jar");
+            }else{
+	            getLog().debug("Use default manifest for EjbClient.");
+            	deleteTaskAttribute( document, "manifest", "wsEjbDeployJarEJBClient" , "jar");
+            }
+
+        	configureTaskAttribute( document, "includes", ejbIncludes , "wsEjbDeployJarEJB" , "jar");
+        	configureTaskAttribute( document, "excludes", ejbExcludes , "wsEjbDeployJarEJB" , "jar");
+        	configureTaskAttribute( document, "destfile", new File( getMavenProject().getBuild().getDirectory(), executedProject.getArtifact().getArtifactId() + "-" + executedProject.getArtifact().getVersion() + ".jar") , "wsEjbDeployJarEJB" , "jar");
+        	configureTaskAttribute( document, "basedir", getWorkingDirectory().getAbsolutePath()+"/ejb" , "wsEjbDeployJarEJB" , "jar");
+            final File manifestEjbFile = new File(ejbManifest);
+            if ( !inputFile.canRead() ){
+	            getLog().debug("Use default manifest.");
+            	deleteTaskAttribute( document, "manifest", "wsEjbDeployJarEJB" , "jar");
+            }else{
+	            getLog().debug("Use manifest :"+ejbManifest);
+	            configureTaskAttribute( document, "manifest", manifestEjbFile ,"wsEjbDeployJarEJB" , "jar");
+            }
         }
     }
 
@@ -287,7 +396,10 @@ public class EjbDeployMojo
             dependencySet.addAll( getMavenProject().getCompileClasspathElements() );
             dependencySet.addAll( getMavenProject().getRuntimeClasspathElements() );
             String compileClasspath = StringUtils.join( dependencySet, File.pathSeparator );
-            
+            if(compileClasspathElements!=null && !compileClasspathElements.isEmpty()){
+            	compileClasspath = File.pathSeparator + StringUtils.join( compileClasspathElements, File.pathSeparator );
+            }
+            getLog().debug( "The compile classpath : "+compileClasspath );
             return compileClasspath;
         }
         catch ( DependencyResolutionRequiredException e )
