@@ -29,7 +29,8 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 	 * Optional parameter specifying the name of the server containing the
 	 * application you wish to start.
 	 * 
-	 * @parameter
+	 * @deprecated use {@link targetServers}
+	 * @parameter expression="${was6.targetServer}"
 	 */
 	private String targetServer;
 
@@ -37,10 +38,17 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 	 * Optional parameter specifying the name of the cluster containing the
 	 * application you wish to start.
 	 * 
-	 * @parameter
+	 * @parameter expression="${was6.targetCluster}"
 	 */
 	private String targetCluster;
-
+	
+	/**
+	 * Optional parameter specifying the servers where the application will be install for multiple servers user separator ";". 
+	 * 
+	 * @parameter expression="${was6.targetServers}"
+	 */
+	private String targetServers;
+	
 	/**
 	 * EAR archive to deploy.
 	 * 
@@ -56,7 +64,15 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 		if (isClusterMode()) {
 			getLog().info("Update application on cluster : " + targetCluster);
 		} else {
-			getLog().info("Update application on server : " + targetServer);
+			if(targetServer!=null && !"".equals(targetServer) ){
+				getLog().warn(" The element \"targetServer\" is deprecated use \"targetServers\".");
+				if(targetServers!=null && !"".equals(targetServers)){
+					throw new MojoExecutionException("Error you couldn't use targetServer with targetServers");
+				}else{
+					targetServers = targetServer;
+				}
+			}
+			getLog().info("Update application on servers : " + targetServers.toString());
 		}
 		File script = new File(getWorkingDirectory(), "WsInstallApps." + (System.currentTimeMillis() / 1000) + ".py");
 		try {
@@ -125,7 +141,7 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 			bfWriter.close();
 
 		} catch (IOException e) {
-			throw new MojoExecutionException("Error on update task : ", e);
+			throw new MojoExecutionException("Error on installApps task : ", e);
 		}
 
 		configureBuildScript(document);
@@ -151,7 +167,7 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 		final StringBuilder strBuilder = new StringBuilder();
 		strBuilder.append("CLUSTER_ID = \"\" \n");
 		strBuilder.append("MEMBERS=[] \n");
-		strBuilder.append("SERVER_OBJECT_NAME = \"\" \n");
+		strBuilder.append("SERVERS=[] \n");
 		strBuilder.append("\n");
 		
 		//The info of the cluster or the server 
@@ -171,10 +187,14 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 			strBuilder.append("print 'The Cluster Id : ' + CLUSTER_ID \n");
 			strBuilder.append("print '########################################################################'\n");
 		}else{
-			strBuilder.append("SERVER_OBJECT_NAME = AdminControl.completeObjectName('WebSphere:type=Server,process="+targetServer+",*') \n");
-			strBuilder.append("print '########################################################################'\n");
-			strBuilder.append("print 'The Server Object Name : ' + SERVER_OBJECT_NAME \n");
-			strBuilder.append("print '########################################################################'\n");
+			String[] tab = targetServers.split(";");
+			for (int i = 0; i < tab.length; i++) {
+				strBuilder.append("tmp_object_name = AdminControl.completeObjectName('WebSphere:type=Server,process="+tab[i]+",*') \n");
+				strBuilder.append("SERVERS.append(tmp_object_name) \n");
+				strBuilder.append("print '########################################################################'\n");
+				strBuilder.append("print 'The Server Object Name : ' + tmp_object_name \n");
+				strBuilder.append("print '########################################################################'\n");
+			}
 		}
 		return strBuilder;
 	}
@@ -296,17 +316,22 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 		final StringBuilder strBuilder = new StringBuilder();
 		getLog().info("Installation of " + pEar.getAppName());
 		strBuilder.append("print 'Installation of application : " + pEar.getAppName() + "' \n");
-		String destinationInfo;
 		if (isClusterMode()) {
-			destinationInfo = " -cluster " + targetCluster;
+			strBuilder.append("destinationInfo = ' -cluster "+targetCluster +"' \n");
 		} else {
-			strBuilder.append("nodeName = AdminControl.getAttribute(SERVER_OBJECT_NAME, 'nodeName') \n");
-			destinationInfo = " -server " + targetServer + " -node ' + nodeName + '";
+			strBuilder.append("targetInstall=\"\" \n");
+			strBuilder.append("for server in SERVERS: \n");
+			strBuilder.append("  if(targetInstall==\"\"):\n");
+			strBuilder.append("    targetInstall=server \n");
+			strBuilder.append("  else:\n");
+			strBuilder.append("    targetInstall=targetInstall+\"+\"+server \n");
+			strBuilder.append("destinationInfo = '-target '+targetInstall \n");
 		}
+		strBuilder.append("print 'Deploy app on : '+ destinationInfo \n");
 		final String options = "  -createMBeansForResources -noreloadEnabled -nodeployws -validateinstall warn -processEmbeddedConfig -noallowDispatchRemoteInclude -usedefaultbindings";
 		final String commande = "AdminApp.install('" + getEarPath(pEar.getEarFile())
 				+ "', '[-nopreCompileJSPs -distributeApp -nouseMetaDataFromBinary -nodeployejb -appname "
-				+ pEar.getAppName() + options + destinationInfo + "]') \n";
+				+ pEar.getAppName() + options +" '+destinationInfo+' ]') \n";
 		getLog().info("Command of install : " + commande);
 		strBuilder.append(commande);
 		strBuilder.append("print 'The application was successefully install ' \n");
@@ -354,16 +379,18 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 			strBuilder.append("  AdminControl.invoke(sync1, 'sync') \n");
 			strBuilder.append("print 'Node synchronization for cluster SUCESS ' \n");
 		}else{
-			getLog().info("Node synchronization for server " + targetServer);
-			strBuilder.append("print 'Node synchronization for server ... ' \n");
-			strBuilder.append("processType = AdminControl.getAttribute(SERVER_OBJECT_NAME, 'processType') \n");
-			strBuilder.append("if (processType!='UnManagedProcess'): \n");
-			strBuilder.append("  nodeName = AdminControl.getAttribute(SERVER_OBJECT_NAME, 'nodeName') \n");
-			strBuilder.append("  sync1 = AdminControl.completeObjectName('type=NodeSync,node='+nodeName+',*') \n");
-			strBuilder.append("  AdminControl.invoke(sync1, 'sync') \n");
-			strBuilder.append("  print 'Node synchronization for server SUCESS ' \n");
-			strBuilder.append("else: \n");
-			strBuilder.append("  print 'Node synchronization not required for devellopement server.' \n");
+			getLog().info("Node synchronization for servers " + targetServers);
+			strBuilder.append("for server in SERVERS: \n");
+			strBuilder.append("  print 'Target serveur : '+targetInstall \n");
+			strBuilder.append("  print 'Node synchronization for server ... ' \n");
+			strBuilder.append("  processType = AdminControl.getAttribute(server, 'processType') \n");
+			strBuilder.append("  if (processType!='UnManagedProcess'): \n");
+			strBuilder.append("    nodeName = AdminControl.getAttribute(server, 'nodeName') \n");
+			strBuilder.append("    sync1 = AdminControl.completeObjectName('type=NodeSync,node='+nodeName+',*') \n");
+			strBuilder.append("    AdminControl.invoke(sync1, 'sync') \n");
+			strBuilder.append("    print 'Node synchronization for server SUCESS ' \n");
+			strBuilder.append("  else: \n");
+			strBuilder.append("    print 'Node synchronization not required for devellopement server.' \n");
 		}
 		return strBuilder;
 	}
@@ -403,11 +430,13 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 	 */
 	private StringBuilder getStopAppForServerScript(final Ear pEar) {
 		final StringBuilder strBuilder = new StringBuilder();
-		getLog().info("Stop application on server : " + targetServer);
+		getLog().info("Stop application on servers : " + targetServers);
 		strBuilder.append("if(IS_STARTED_"+pEar.getLocalId()+"=='true'):\n");
-		strBuilder.append("    print 'Stop application on server " +  pEar.getAppName() + " ... '\n");
-		strBuilder.append("    nodeName = AdminControl.getAttribute(SERVER_OBJECT_NAME, 'nodeName') \n");
-		strBuilder.append("    appManager = AdminControl.queryNames('WebSphere:*,node='+nodeName+',type=ApplicationManager,process=" + targetServer + "') \n");
+		strBuilder.append("  for server in SERVERS: \n");
+		strBuilder.append("    serverName = AdminControl.getAttribute(server, 'name') \n");
+		strBuilder.append("    print 'Stop application " +  pEar.getAppName() + " on server '+serverName+' ... '\n");
+		strBuilder.append("    nodeName = AdminControl.getAttribute(server, 'nodeName') \n");
+		strBuilder.append("    appManager = AdminControl.queryNames('WebSphere:*,node='+nodeName+',type=ApplicationManager,process='+serverName) \n");
 		strBuilder.append("    AdminControl.invoke(appManager, 'stopApplication', '" + pEar.getAppName() + "') \n");
 		strBuilder.append("    print 'Stop application on server : OK' \n");
 		return strBuilder;
@@ -442,20 +471,24 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 	 */
 	private StringBuilder getStartAppForServerScript(final Ear pEar) {
 		final StringBuilder strBuilder = new StringBuilder();
-		getLog().info("Start application on server : " + targetServer);
+		getLog().info("Start application on servers : " + targetServers);
 		if("CURRENT_STATE".equals(pEar.getStartAfterInstall())){
 			strBuilder.append("if(IS_STARTED_"+pEar.getLocalId()+"=='true'):\n");
-			strBuilder.append("    print 'Start application on server " +  pEar.getAppName() + " ... '\n");
-			strBuilder.append("    nodeName = AdminControl.getAttribute(SERVER_OBJECT_NAME, 'nodeName') \n");
-			strBuilder.append("    appManager = AdminControl.queryNames('WebSphere:*,node='+nodeName+',type=ApplicationManager,process=" + targetServer + "') \n");
+			strBuilder.append("  for server in SERVERS: \n");
+			strBuilder.append("    serverName = AdminControl.getAttribute(server, 'name') \n");
+			strBuilder.append("    print 'Start application " +  pEar.getAppName() + " on server '+serverName+' ... '\n");
+			strBuilder.append("    nodeName = AdminControl.getAttribute(server, 'nodeName') \n");
+			strBuilder.append("    appManager = AdminControl.queryNames('WebSphere:*,node='+nodeName+',type=ApplicationManager,process='+serverName) \n");
 			strBuilder.append("    AdminControl.invoke(appManager, 'startApplication', '" + pEar.getAppName() + "') \n");
 			strBuilder.append("    print 'Start application on server : OK' \n");
 		}else {
-			strBuilder.append("print 'Start application on server " +  pEar.getAppName() + " ... '\n");
-			strBuilder.append("nodeName = AdminControl.getAttribute(SERVER_OBJECT_NAME, 'nodeName') \n");
-			strBuilder.append("appManager = AdminControl.queryNames('WebSphere:*,node='+nodeName+',type=ApplicationManager,process=" + targetServer + "') \n");
-			strBuilder.append("AdminControl.invoke(appManager, 'startApplication', '" + pEar.getAppName() + "') \n");
-			strBuilder.append("print 'Start application on server : OK' \n");
+			strBuilder.append("for server in SERVERS: \n");
+			strBuilder.append("  serverName = AdminControl.getAttribute(server, 'name') \n");
+			strBuilder.append("  print 'Start application " +  pEar.getAppName() + " on server '+serverName+' ... '\n");
+			strBuilder.append("  nodeName = AdminControl.getAttribute(server, 'nodeName') \n");
+			strBuilder.append("  appManager = AdminControl.queryNames('WebSphere:*,node='+nodeName+',type=ApplicationManager,process='+serverName) \n");
+			strBuilder.append("  AdminControl.invoke(appManager, 'startApplication', '" + pEar.getAppName() + "') \n");
+			strBuilder.append("  print 'Start application on server : OK' \n");
 		}
 		return strBuilder;
 	}
@@ -506,7 +539,7 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 	private boolean isClusterMode() {
 		return targetCluster != null && !targetCluster.trim().equals("");
 	}
-
+	
 	/**
 	 * {@inheritDoc}
 	 */
