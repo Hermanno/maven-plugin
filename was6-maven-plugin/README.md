@@ -15,8 +15,9 @@ For the others goals see : [codehaus](http://mojo.codehaus.org/was6-maven-plugin
 
 ## Generating stub code for an EJB
 
-Generate stub-code and put the stub-code for EjbClient in a spécifique jar.
-You while get 2 jar 
+With genEjbClientJar parameter you will generate stub-code and put the stub-code for EjbClient in a specific jar.
+
+You will get two jar 
 * XxxxxEjb.jar > Contain all the file
 * XxxxxEjbClient.jar > Contain only the stub-code for EbjClient.
 
@@ -46,7 +47,7 @@ You while get 2 jar
 
 ## Install application
 
-For install several applications on one cluster or on one or several servers
+For install several applications on one cluster or on several servers
 
 ```xml
 			<plugin>
