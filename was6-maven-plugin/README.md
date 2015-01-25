@@ -11,7 +11,7 @@ For install several applications on one cluster or on one or several servers
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>was6-maven-plugin</artifactId>
-                <version>1.1.13-SNAPSHOT</version>
+                <version>1.3.0-SNAPSHOT</version>
                 <executions>
                     <execution>
                         <id>integration-test</id>
