@@ -310,6 +310,7 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 		getLog().info("Command of install : " + commande);
 		strBuilder.append(commande);
 		strBuilder.append("print 'The application was successefully install ' \n");
+		strBuilder.append(getSaveScript());
 		//Re-initialization the App's info
 		strBuilder.append(getAppInfoScript(pEar));
 		return strBuilder;
