@@ -3,6 +3,47 @@
 Maven plugin for Websphere application server tasks.
 Forked from was6-maven-plugin 1.2.2 on codehaus http://svn.codehaus.org/mojo/tags/was6-maven-plugin-1.2.2/
 
+---
+
+The specific goals :
+* [ejbdeploy](#generating-stub-code-for-an-ejb)
+* [installApps](#install-application)
+
+For the others goals see : [codehaus](http://mojo.codehaus.org/was6-maven-plugin/plugin-info.html) 
+
+---
+
+## Generating stub code for an EJB
+
+Generate stub-code and put the stub-code for EjbClient in a spécifique jar.
+You while get 2 jar 
+* XxxxxEjb.jar > Contain all the file
+* XxxxxEjbClient.jar > Contain only the stub-code for EbjClient.
+
+```xml
+				<plugin>
+					<groupId>org.codehaus.mojo</groupId>
+					<artifactId>was6-maven-plugin</artifactId>
+					<version>1.3.0-SNAPSHOT</version>
+					<executions>
+						<execution>
+							<id>was-ejbdeploy</id>
+							<phase>integration-test</phase>
+							<goals>
+								<goal>ejbdeploy</goal>
+							</goals>
+							<configuration>
+								<wasHome>${was61.home}</wasHome>
+								<verbose>true</verbose>
+								<genEjbClientJar>true</genEjbClientJar>
+								<ejbClientIncludes>com/ibm/websphere/**,fr/canalplus/**,org/omg/stub/**</ejbClientIncludes>
+								<ejbClientExcludes>**/_EJS*.class,**/EJS*.class</ejbClientExcludes>
+							</configuration>
+						</execution>
+					</executions>
+				</plugin>
+```
+
 ## Install application
 
 For install several applications on one cluster or on one or several servers
