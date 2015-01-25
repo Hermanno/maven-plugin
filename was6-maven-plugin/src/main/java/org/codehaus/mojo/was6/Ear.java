@@ -28,18 +28,27 @@ public class Ear {
     
     /**
      * Enable or disable the start-auto of the application.
+     * </br>DISABLE : disable the start-auto.
+     * </br>ENABLE : enable the start-auto.
+     * </br>CURRENT_STATE : In case that the application is already installed it will take the existing configuration.
      *
-     * @parameter expression="${startAuto}" default-value="false"
+     * @parameter expression="${startAuto}" default-value="DISABLE"
      */
-    private boolean startAuto;
+    private String startAuto;
 
     /**
      * Enable or disable the start of the application after its installation.
+     * </br>START : Start the application after its installation.
+     * </br>STOP : Don't start the application after its installation.
+     * </br>CURRENT_STATE : In case that the application is already installed it will start the application if it was started.
      *
-     * @parameter expression="${startAfterInstall}" default-value="true"
+     * @parameter expression="${startAfterInstall}" default-value="START"
      */
-    private boolean startAfterInstall = true;
+    private String startAfterInstall;
     
+    /** The id of the ear use in the jacl script. */
+    private int localId;
+        
 	/**
 	 * @return the EAR archive to deploy.
 	 */
@@ -69,31 +78,45 @@ public class Ear {
 	}
 
 	/**
-	 * @return true if the start-auto of the application is enable.
+	 * @return The state of the start-auto of the application.
 	 */
-	public boolean isStartAuto() {
+	public String getStartAuto() {
 		return startAuto;
 	}
 
 	/**
-	 * @param pStartAuto set if the start-auto of the application is enable.
+	 * @param pStartAuto set state of the start-auto of the application.
 	 */
-	public void setStartAuto(final boolean pStartAuto) {
+	public void setStartAuto(final String pStartAuto) {
 		startAuto = pStartAuto;
 	}
 
 	/**
-	 * @return if the start of the application after its installation is enable.
+	 * @return if the application will be started after its installation.
 	 */
-	public boolean isStartAfterInstall() {
+	public String getStartAfterInstall() {
 		return startAfterInstall;
 	}
 
 	/**
-	 * @param pStartAfterInstall set if the start of the application after its installation is enable.
+	 * @param pStartAfterInstall set if the application will be started after its installation.
 	 */
-	public void setStartAfterInstall(boolean pStartAfterInstall) {
+	public void setStartAfterInstall(final String pStartAfterInstall) {
 		startAfterInstall = pStartAfterInstall;
+	}
+
+	/**
+	 * @return The id of the ear use in the jacl script.
+	 */
+	public int getLocalId() {
+		return localId;
+	}
+
+	/**
+	 * @param localId set the id of the ear use in the jacl script.
+	 */
+	public void setLocalId(int localId) {
+		this.localId = localId;
 	}
 
 }
