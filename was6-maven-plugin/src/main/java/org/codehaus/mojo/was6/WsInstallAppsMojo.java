@@ -65,6 +65,7 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 			final StringBuilder scriptToGetServerClusterInfo = new StringBuilder();
 			final StringBuilder scriptToGetAppInfo = new StringBuilder();
 			final StringBuilder scriptToPreviousInstallationInfo = new StringBuilder();
+			final StringBuilder scritpToStopApps = new StringBuilder();
 			final StringBuilder scritpToUninstallApps = new StringBuilder();
 			final StringBuilder scritpToInstallApps = new StringBuilder();
 			final StringBuilder scritpToEnableStartAutoApps = new StringBuilder();
@@ -77,6 +78,7 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 				ear.setLocalId(i);
 				scriptToGetAppInfo.append(getAppInfoScript(ear));
 				scriptToPreviousInstallationInfo.append(getPreviousInstallationInfoScript(ear));
+				scritpToStopApps.append(getStopApplScript(ear));
 				scritpToUninstallApps.append(getUninstallAppScript(ear));
 				scritpToInstallApps.append(getInstallAppScript(ear));
 				scritpToEnableStartAutoApps.append(getAppStartAutoScript(ear));
@@ -95,6 +97,10 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 			
 			// Set the informations of the application
 			bfWriter.append(scriptToPreviousInstallationInfo);
+			bfWriter.append(getSaveScript());
+			
+			// Stop old version if exist and if started
+			bfWriter.append(scritpToStopApps);
 			bfWriter.append(getSaveScript());
 			
 			// Uninstall old version if exist
@@ -219,19 +225,9 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 		strBuilder.append("if(DEPLOYMENT_ID_"+pEar.getLocalId()+"!=\"\"):\n");
 		strBuilder.append("    for aTarget in TARGET_MAP_"+pEar.getLocalId()+":\n");
 		strBuilder.append("       IS_START_AUTO_ENABLE_"+pEar.getLocalId()+" = AdminConfig.showAttribute(aTarget, 'enable') \n");
-		if(isClusterMode()){
-			strBuilder.append("    for member in MEMBERS: \n");
-			strBuilder.append("        nodeName = AdminConfig.showAttribute(member, 'nodeName' ) \n");
-			strBuilder.append("        appID = AdminControl.completeObjectName('type=Application,node='+nodeName+',Server="+targetServer+",name="+pEar.getAppName()+",*') \n" );
-			strBuilder.append("        if (len(appID) > 0): \n" );
-			strBuilder.append("            IS_STARTED_"+pEar.getLocalId()+" = 'true' \n" );
-			strBuilder.append("            break \n" );
-		}else{
-			strBuilder.append("    nodeName = AdminControl.getAttribute(SERVER_OBJECT_NAME, 'nodeName') \n");
-			strBuilder.append("    appID = AdminControl.completeObjectName('type=Application,node='+nodeName+',Server="+targetServer+",name="+pEar.getAppName()+",*') \n" );
-			strBuilder.append("    if (len(appID) > 0): \n" );
-			strBuilder.append("        IS_STARTED_"+pEar.getLocalId()+" = 'true' \n" );
-		}
+		strBuilder.append("    appID = AdminControl.completeObjectName('type=Application,name="+pEar.getAppName()+",*') \n" );
+		strBuilder.append("    if (len(appID) > 0): \n" );
+		strBuilder.append("        IS_STARTED_"+pEar.getLocalId()+" = 'true' \n" );
 		
 		strBuilder.append("print '########################################################################'\n");
 		strBuilder.append("print 'The application " + pEar.getAppName() + " is already installed : ' + IS_INSTALLED_"+pEar.getLocalId()+" \n");
@@ -360,7 +356,7 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 			getLog().info("Node synchronization for server " + targetServer);
 			strBuilder.append("print 'Node synchronization for server ... ' \n");
 			strBuilder.append("processType = AdminControl.getAttribute(SERVER_OBJECT_NAME, 'processType') \n");
-			strBuilder.append("if (processType=='DeploymentManager'): \n");
+			strBuilder.append("if (processType!='UnManagedProcess'): \n");
 			strBuilder.append("  nodeName = AdminControl.getAttribute(SERVER_OBJECT_NAME, 'nodeName') \n");
 			strBuilder.append("  sync1 = AdminControl.completeObjectName('type=NodeSync,node='+nodeName+',*') \n");
 			strBuilder.append("  AdminControl.invoke(sync1, 'sync') \n");
@@ -385,6 +381,59 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 		}
 	}
 
+	/**
+	 * Build script to stop application on a single server or on a cluster.
+	 * 
+	 * @return The script to stop application on a single server or on a
+	 *         cluster.
+	 */
+	private StringBuilder getStopApplScript(final Ear pEar) {
+		if (isClusterMode()) {
+			return getStopAppForClusterScript(pEar);
+		} else {
+			return getStopAppForServerScript(pEar);
+		}
+	}
+	
+	/**
+	 * Build script to stop application on a single server.
+	 * 
+	 * @return The script to stop application on a single server.
+	 */
+	private StringBuilder getStopAppForServerScript(final Ear pEar) {
+		final StringBuilder strBuilder = new StringBuilder();
+		getLog().info("Stop application on server : " + targetServer);
+		strBuilder.append("if(IS_STARTED_"+pEar.getLocalId()+"=='true'):\n");
+		strBuilder.append("    print 'Stop application on server " +  pEar.getAppName() + " ... '\n");
+		strBuilder.append("    nodeName = AdminControl.getAttribute(SERVER_OBJECT_NAME, 'nodeName') \n");
+		strBuilder.append("    appManager = AdminControl.queryNames('WebSphere:*,node='+nodeName+',type=ApplicationManager,process=" + targetServer + "') \n");
+		strBuilder.append("    AdminControl.invoke(appManager, 'stopApplication', '" + pEar.getAppName() + "') \n");
+		strBuilder.append("    print 'Stop application on server : OK' \n");
+		return strBuilder;
+	}
+
+	/**
+	 * Build script to stop application on a cluster.
+	 * 
+	 * @param pAppNameOnWas
+	 *            the name of the application on websphere to uninstall.
+	 * @return the script to stop application on a cluster.
+	 */
+	private StringBuilder getStopAppForClusterScript(final Ear pEar) {
+		final StringBuilder strBuilder = new StringBuilder();
+		getLog().info("Stop application on cluster : " + targetCluster);
+		strBuilder.append("if(IS_STARTED_"+pEar.getLocalId()+"=='true'):\n");
+		strBuilder.append("    for member in MEMBERS: \n");
+		strBuilder.append("        node = AdminConfig.showAttribute(member, 'nodeName' ) \n");
+		strBuilder.append("        server = AdminConfig.showAttribute(member, 'memberName' ) \n");
+		strBuilder.append("        print 'Node = ' + node + ' server = ' + server \n");
+		strBuilder.append("        am = AdminControl.queryNames('WebSphere:*,type=ApplicationManager,process=' + server + ',node=' + node) \n");
+		strBuilder.append("        AdminControl.invoke(am,'stopApplication','" + pEar.getAppName() + "') \n");
+		strBuilder.append("        print 'Stop " + pEar.getAppName() + " OK on ' + server \n");
+		strBuilder.append("    print 'Stop OK on cluster ' \n");
+		return strBuilder;
+	}
+	
 	/**
 	 * Build script to start application on a single server.
 	 * 
@@ -448,13 +497,6 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 	 */
 	private static String getSaveScript() throws IOException {
 		return "\nAdminConfig.save() \n\n";
-	}
-
-	/**
-	 * @return the empty line.
-	 */
-	private static String getEmptyLine() {
-		return "\n";
 	}
 
 	/**
