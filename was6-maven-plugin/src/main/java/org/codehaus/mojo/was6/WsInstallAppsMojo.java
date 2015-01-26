@@ -76,6 +76,10 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 		}
 		File script = new File(getWorkingDirectory(), "WsInstallApps." + (System.currentTimeMillis() / 1000) + ".py");
 		try {
+			
+			script.getParentFile().mkdir();
+			script.createNewFile();
+			
 			BufferedWriter bfWriter = new BufferedWriter(new FileWriter(script));
 
 			final StringBuilder scriptToGetServerClusterInfo = new StringBuilder();
@@ -144,7 +148,7 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 			throw new MojoExecutionException("Error on installApps task : ", e);
 		}
 
-		configureBuildScript(document);
+		super.configureBuildScript(document);
 		
 		super.configureTaskAttribute(document, "profileName", null);
 		super.configureTaskAttribute(document, "profile", null);

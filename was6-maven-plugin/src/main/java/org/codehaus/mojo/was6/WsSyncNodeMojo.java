@@ -73,6 +73,8 @@ public class WsSyncNodeMojo extends AbstractWas6Mojo {
     {
     	File script = new File( getWorkingDirectory(), "was6plugin-script-syncNode." + System.currentTimeMillis() + ".jacl" );
     	try {
+    		script.getParentFile().mkdir();
+			script.createNewFile();
 			BufferedWriter bfWriter = new BufferedWriter(new FileWriter(script));
 			bfWriter.write("set Sync1 [$AdminControl completeObjectName type=NodeSync,node="+targetNode+",*] \n");
 			bfWriter.write("$AdminControl invoke $Sync1 sync");
