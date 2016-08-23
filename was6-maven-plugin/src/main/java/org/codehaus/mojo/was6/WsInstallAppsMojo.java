@@ -56,6 +56,14 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 	 * @required
 	 */
 	private List<Ear> ears;
+	/**
+	 * The validateinstall option specifies the level of application installation validation in wsadmin. Valid option values include :<br/>
+	 * off (default value) - Specifies no application deployment validation.<br/>
+	 * warn - Performs application deployment validation and continues with the application deployment process even when reported warnings or error messages exist.<br/>
+	 * fail - Performs application deployment validation and does not to continue with the application deployment process when reported warnings or error messages exist
+	 * @parameter expression="${was6.validateInstall}" default-value="off"
+	 */
+	private String validateInstall;
 
 	/**
 	 * {@inheritDoc}
@@ -72,6 +80,9 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 					targetServers = targetServer;
 				}
 			}
+			else if (this.targetServers == null || "".equals(this.targetServers)){
+                throw new MojoExecutionException("targetServers can't be null or empty in server deployment Mode.");
+            }
 			getLog().info("Update application on servers : " + targetServers.toString());
 		}
 		File script = new File(getWorkingDirectory(), "WsInstallApps." + (System.currentTimeMillis() / 1000) + ".py");
@@ -309,7 +320,7 @@ public class WsInstallAppsMojo extends AbstractAppMojo {
 			strBuilder.append("destinationInfo = ' -MapModulesToServers [[ .* .*  '+targetInstall+ ' ]] '\n");
 		}
 		strBuilder.append("print 'Deploy app on : '+ destinationInfo \n");
-		final String options = "  -createMBeansForResources -noreloadEnabled -nodeployws -validateinstall warn -processEmbeddedConfig -noallowDispatchRemoteInclude -usedefaultbindings";
+		final String options = "  -createMBeansForResources -noreloadEnabled -nodeployws -validateinstall " + this.validateInstall + " -processEmbeddedConfig -noallowDispatchRemoteInclude -usedefaultbindings";
 		final String commande = "AdminApp.install('" + getEarPath(pEar.getEarFile())
 				+ "', '[-nopreCompileJSPs -distributeApp -nouseMetaDataFromBinary -nodeployejb "
 				+ " -filepermission .*\\.dll=755#.*\\.so=755#.*\\.a=755#.*\\.sl=755 -appname "
